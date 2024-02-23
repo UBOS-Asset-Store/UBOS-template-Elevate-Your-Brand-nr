@@ -1,0 +1,239 @@
+[
+    {
+        "id": "c75f6c7da163fa74",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "fa45cbb440c15bbe",
+        "type": "function",
+        "z": "c75f6c7da163fa74",
+        "name": "",
+        "func": "msg.userData = msg.payload;\n\nmsg.url = msg.payload.url.trim();\nreturn msg;\n\n\n\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [
+            {
+                "var": "objectid",
+                "module": "objectid"
+            }
+        ],
+        "x": 300,
+        "y": 180,
+        "wires": [
+            [
+                "7f2be4f9f0bbac2e"
+            ]
+        ]
+    },
+    {
+        "id": "7f2be4f9f0bbac2e",
+        "type": "http request",
+        "z": "c75f6c7da163fa74",
+        "name": "Get Link Info",
+        "method": "GET",
+        "ret": "txt",
+        "paytoqs": "ignore",
+        "url": "",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 450,
+        "y": 180,
+        "wires": [
+            [
+                "dd3e2acfafe5114e"
+            ]
+        ]
+    },
+    {
+        "id": "dd3e2acfafe5114e",
+        "type": "function",
+        "z": "c75f6c7da163fa74",
+        "name": "Scrape",
+        "func": "const { JSDOM } = jsdom;\nconst html = msg.payload;\nconst dom = new JSDOM(`${html}`);\n\ndom.window.document.querySelectorAll('style').forEach(link => {\n    link.remove();\n});\ndom.window.document.querySelectorAll('script').forEach(link => {\n    link.remove();\n});\n\nconst document = dom.window.document;\nconst pageText = document.body.textContent;\n\nmsg.text = pageText;\n\nlet table = dom.window.document.querySelector('table');\nlet ckeckTable = table?.textContent ? true : false;\n\nif (ckeckTable) {\n    const headers = Array.from(table.querySelectorAll('tr:first-child th, tr:first-child td')).map(td => {\n        const text = td.textContent.trim();\n        return text !== \"\" ? text : undefined;\n    }).filter(Boolean);\n\n    const rows = Array.from(table.querySelectorAll('tr:not(:first-child)'));\n    const tableData = rows.map(row => {\n        const rowData = Array.from(row.querySelectorAll('td')).map(td => td.textContent.trim());\n        return Object.fromEntries(headers.map((header, index) => [header, rowData[index]]));\n    });\n\n} else {\n     msg.pageContent = pageText;\n}\n\nconst MAX_LENGTH = 500;\n\nmsg.result = [];\nlet currentParagraph = '';\n\nconst sentences = msg.pageContent.replace(/\\s+/g, ' ').split(/([.?!])+/).filter(sentence => sentence.trim() !== '');\n\nfor (const sentence of sentences) {\n    if (currentParagraph.length + sentence.length <= MAX_LENGTH) {\n        currentParagraph += sentence;\n    } else {\n        msg.result.push(currentParagraph.trim());\n        currentParagraph = sentence;\n    }\n}\n\nif (currentParagraph.trim() !== '') {\n    msg.result.push(currentParagraph.trim());\n}\n\nmsg.payload = msg.result;\n\nreturn msg;\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [
+            {
+                "var": "jsdom",
+                "module": "jsdom"
+            }
+        ],
+        "x": 600,
+        "y": 180,
+        "wires": [
+            [
+                "99c1579d785ed00e"
+            ]
+        ]
+    },
+    {
+        "id": "7b8e45decdc7489f",
+        "type": "http in",
+        "z": "c75f6c7da163fa74",
+        "name": "",
+        "url": "/getAdvice",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 120,
+        "y": 180,
+        "wires": [
+            [
+                "fa45cbb440c15bbe"
+            ]
+        ]
+    },
+    {
+        "id": "99c1579d785ed00e",
+        "type": "function",
+        "z": "c75f6c7da163fa74",
+        "name": "make request to OpenAI",
+        "func": "const data = msg.pageContent;\nmsg.OPENAI_API_KEY = msg.userData.openAIKey;\nmsg.model = msg.userData.model;\n\nmsg.messages= [\n    {\n        role: \"system\",\n        content: \"act as a world class branding team\",\n    },\n    {\n        role: \"user\", content: `This is a list of content related to ${msg.url}: \n\n\"\"\"\n\n${data}\n\n\"\"\" \nReverse engineer the branding guidelines of the website above. The brand guidelines should be informative & useful. You should include:\n1. Brand voice & tone\n2. Brand messaging\n3. Audience\n4. Value proposition\n5. Content themes\n\nBrand guidelines:` },\n];\n\n\n\nreturn msg;\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 790,
+        "y": 180,
+        "wires": [
+            [
+                "a6934464803c6bc0"
+            ]
+        ]
+    },
+    {
+        "id": "a6934464803c6bc0",
+        "type": "openai-ubos",
+        "z": "c75f6c7da163fa74",
+        "name": "",
+        "model": "gpt-3.5-turbo",
+        "temperature": 0.5,
+        "max_tokens": 500,
+        "prompt": "",
+        "frequency_penalty": 0,
+        "presence_penalty": 0,
+        "top_p": 1,
+        "stop": {
+            "type": "json",
+            "value": "[]"
+        },
+        "OPENAI_API_KEY": "",
+        "x": 1000,
+        "y": 180,
+        "wires": [
+            [
+                "9308a3d13952f1a4"
+            ]
+        ]
+    },
+    {
+        "id": "f322b07cef60d4ac",
+        "type": "http response",
+        "z": "c75f6c7da163fa74",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 1290,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "9308a3d13952f1a4",
+        "type": "function",
+        "z": "c75f6c7da163fa74",
+        "name": "response",
+        "func": "if(msg.statusCode === 200){\n    const answers = msg.payload.choices[0].message.content\n    msg.payload= answers;\n}\nelse {\n    msg.payload = `     Ooops, something went wrong!🥲\n    ${msg.payload.error.message}`\n}\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1160,
+        "y": 180,
+        "wires": [
+            [
+                "f322b07cef60d4ac",
+                "ff81522bb29bd663"
+            ]
+        ]
+    },
+    {
+        "id": "ff81522bb29bd663",
+        "type": "debug",
+        "z": "c75f6c7da163fa74",
+        "name": "debug 1",
+        "active": false,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1260,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "9f20f1deef775ad8",
+        "type": "http in",
+        "z": "c75f6c7da163fa74",
+        "name": "",
+        "url": "/style",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 80,
+        "y": 100,
+        "wires": [
+            [
+                "03ba76c2e2d50a51"
+            ]
+        ]
+    },
+    {
+        "id": "bee07027d58c6068",
+        "type": "http response",
+        "z": "c75f6c7da163fa74",
+        "name": "",
+        "statusCode": "",
+        "headers": {
+            "content-type": "text/css"
+        },
+        "x": 410,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "03ba76c2e2d50a51",
+        "type": "template",
+        "z": "c75f6c7da163fa74",
+        "name": "customCSS",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "css",
+        "syntax": "mustache",
+        "template": "::-webkit-scrollbar {\n  width: 0.1px;\n  scrollbar-color: #9bc7f38b;\n}\n.main_container {\n  top:0 !important;\n  left: 0 !important; \n  height: 100vh !important;\n  width: 100% !important;\n  padding: 10px !important;\n  background-image: linear-gradient(180deg, #ffffff 25%, #fccac39d 100%) !important;\n\n}\n\n.main_container>div>div>div>div>div>div>div>div>div>div>div>div>div{\n  display:flex;\n  justify-content: center;\n  align-items: center;\n  gap: 10px;\n}\n\n.main_container>div>div>div>div>div>div>div>div>div>div {\n  height:100% !important; \n}\n.form_container, .answer_container   {\n    position: relative !important;\n    top: 0 !important;\n    left: 0 !important;\n    max-height: 95vh !important;\n}\n\n.bp3-input, .select-button {\n    border-radius: 5px !important;\n    color: #231F20 !important;\n}\n.select-button span {\n    color: inherit !important;\n}\n\n.title .bp3-ui-text {\n   font-size: clamp(20px, 2.3vw, 50px) !important; \n   cursor: default !important;\n}\n\n.generate_btn span{\n    color: #FFFFFF !important;\n}\n.answer_container>div {\n  border-radius: 10px;\n  box-shadow: rgba(0, 0, 0, 0.25) 0px 0px 4px 3px !important;\n}\n.answer_container>div>div>div>div>div>div>div {\n  border-radius: 10px;\n  padding: 7px !important;\n  \n}\n.label-container {\n  justify-content: space-between !important;\n}\n\n",
+        "output": "str",
+        "x": 250,
+        "y": 100,
+        "wires": [
+            [
+                "bee07027d58c6068"
+            ]
+        ]
+    }
+]
